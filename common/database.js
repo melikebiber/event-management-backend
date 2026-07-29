@@ -1,24 +1,23 @@
 const { Sequelize } = require('sequelize');
 
-const sequelize = new Sequelize(
-  process.env.DB_NAME,
-  process.env.DB_USER,
-  process.env.DB_PASSWORD,
-  {
-    host: process.env.DB_HOST,
-    dialect: 'postgres',
-    port: Number(process.env.DB_PORT || 5432),
-    logging: false,
-    dialectOptions:
-      process.env.NODE_ENV === 'production'
-        ? {
-            ssl: {
-              require: true,
-              rejectUnauthorized: false
-            }
-          }
-        : {}
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL ortam değişkeni tanımlı değil.');
+}
+
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: 'postgres',
+  logging: false,
+  dialectOptions: {
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    }
+  },
+  pool: {
+    max: 3,
+    min: 0,
+    idle: 10000
   }
-);
+});
 
 module.exports = sequelize;
