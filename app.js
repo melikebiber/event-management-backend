@@ -25,7 +25,10 @@ const cors = require('cors');
 const app = express();
 
 app.use(cors({
-  origin: 'http://localhost:4200'
+  origin: [
+    'http://localhost:4200',
+    'https://event-management-frontend-beryl-three.vercel.app'
+  ]
 }));
 
 app.use(express.json());
