@@ -29,6 +29,21 @@ app.use(cors({
 }));
 
 app.use(express.json());
+const databaseReady = sequelize.sync();
+
+app.use(async (req, res, next) => {
+  try {
+    await databaseReady;
+    next();
+  } catch (error) {
+    console.error('Veritabanı senkronizasyon hatası:', error);
+
+    res.status(500).json({
+      success: false,
+      error: 'Veritabanı hazırlanamadı.'
+    });
+  }
+});
 
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -122,7 +137,6 @@ Registration.belongsTo(Ticket, {
   as: 'ticket'
 });
 
-sequelize.sync() //veritabanı ile modelimizi senkronize ediyoruz.
 
 /**
  * @swagger
@@ -161,4 +175,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
