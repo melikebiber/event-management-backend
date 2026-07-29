@@ -1,14 +1,23 @@
 const { Sequelize } = require('sequelize');
 
 const sequelize = new Sequelize(
-  'event_management_system',
-  'postgres',
-  '358',
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
   {
-    host: '::1',
+    host: process.env.DB_HOST,
     dialect: 'postgres',
-    port: 5432,
-    logging: false
+    port: Number(process.env.DB_PORT || 5432),
+    logging: false,
+    dialectOptions:
+      process.env.NODE_ENV === 'production'
+        ? {
+            ssl: {
+              require: true,
+              rejectUnauthorized: false
+            }
+          }
+        : {}
   }
 );
 
