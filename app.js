@@ -32,6 +32,16 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+app.use(
+  '/api-docs',
+  swaggerUi.serveFiles(swaggerSpec),
+  swaggerUi.setup(swaggerSpec)
+);
 const databaseReady = sequelize.sync();
 
 app.use(async (req, res, next) => {
@@ -48,8 +58,6 @@ app.use(async (req, res, next) => {
   }
 });
 
-
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use('/', authRoutes);
 app.use('/users', userRoutes);
