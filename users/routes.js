@@ -70,6 +70,96 @@ router.get('/all', check, has('ADMIN'), UserController.getAllUsers);
  *       404:
  *         description: Kullanıcı bulunamadı
  */
+
+/**
+ * @swagger
+ * /users/profile:
+ *   put:
+ *     summary: Giriş yapan kullanıcının profil bilgilerini günceller
+ *     tags:
+ *       - Users
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Melike
+ *               surname:
+ *                 type: string
+ *                 example: Biber
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: melike@example.com
+ *               phone:
+ *                 type: string
+ *                 example: "05551234567"
+ *     responses:
+ *       200:
+ *         description: Profil başarıyla güncellendi
+ *       401:
+ *         description: Token eksik veya geçersiz
+ *       404:
+ *         description: Kullanıcı bulunamadı
+ *       409:
+ *         description: E-posta adresi zaten kullanılıyor
+ */
+router.put(
+  '/profile',
+  check,
+  UserController.updateProfile
+);
+
+/**
+ * @swagger
+ * /users/change-password:
+ *   put:
+ *     summary: Giriş yapan kullanıcının şifresini değiştirir
+ *     tags:
+ *       - Users
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *               - confirmPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 example: eskiSifre123
+ *               newPassword:
+ *                 type: string
+ *                 example: yeniSifre123
+ *               confirmPassword:
+ *                 type: string
+ *                 example: yeniSifre123
+ *     responses:
+ *       200:
+ *         description: Şifre başarıyla değiştirildi
+ *       400:
+ *         description: Girilen bilgiler geçersiz
+ *       401:
+ *         description: Mevcut şifre hatalı veya token geçersiz
+ *       404:
+ *         description: Kullanıcı bulunamadı
+ */
+router.put(
+  '/change-password',
+  check,
+  UserController.changePassword
+);
 router.get(
   '/:userId',
   check,
