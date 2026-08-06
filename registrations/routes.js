@@ -84,6 +84,29 @@ router.get(
   '/user/:userId',
   RegistrationController.getUserRegistrations
 );
+/**
+ * @swagger
+ * /registrations/user/{userId}/cancelled:
+ *   get:
+ *     summary: Bir kullanıcının iptal ettiği etkinlik kayıtlarını listeler
+ *     tags:
+ *       - Registrations
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: İptal edilen kayıtlar başarıyla listelendi
+ *       500:
+ *         description: Sunucu hatası
+ */
+router.get(
+  '/user/:userId/cancelled',
+  RegistrationController.getUserCancelledRegistrations
+);
 
 /**
  * @swagger

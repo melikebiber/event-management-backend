@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const databaseModule = require('../common/database');
 
 const sequelize =
@@ -199,22 +200,28 @@ if (event.status !== 'active') {
     }
 
     // Kullanıcı aynı etkinliğe daha önce kayıt olmuş mu?
-    const existingRegistration = await Registration.findOne({
-      where: {
-        user_id,
-        event_id
-      },
-      transaction
-    });
+    const existingRegistration =
+  await Registration.findOne({
+    where: {
+      user_id,
+      event_id
+    },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
 
-    if (existingRegistration) {
-      await transaction.rollback();
+if (
+  existingRegistration &&
+  existingRegistration.status !== 'cancelled'
+) {
+  await transaction.rollback();
 
-      return res.status(409).json({
-        success: false,
-        message: 'Kullanıcı bu etkinliğe zaten kayıtlıdır.'
-      });
-    }
+  return res.status(409).json({
+    success: false,
+    message:
+      'Kullanıcı bu etkinliğe zaten kayıtlıdır.'
+  });
+}
 
     if (ticket.available_quantity <= 0) {
       await transaction.rollback();
@@ -225,17 +232,35 @@ if (event.status !== 'active') {
       });
     }
 
-    const registration = await Registration.create(
-      {
-        user_id,
-        event_id,
-        ticket_id,
-        status: 'registered'
-      },
-      {
-        transaction
-      }
-    );
+    let registration;
+
+if (
+  existingRegistration &&
+  existingRegistration.status === 'cancelled'
+) {
+  existingRegistration.ticket_id = ticket_id;
+  existingRegistration.status = 'registered';
+  existingRegistration.registration_date =
+    new Date();
+
+  await existingRegistration.save({
+    transaction
+  });
+
+  registration = existingRegistration;
+} else {
+  registration = await Registration.create(
+    {
+      user_id,
+      event_id,
+      ticket_id,
+      status: 'registered'
+    },
+    {
+      transaction
+    }
+  );
+}
 
     // Kalan bilet sayısını bir azalt
     ticket.available_quantity -= 1;
@@ -262,15 +287,20 @@ if (event.status !== 'active') {
   }
 };
 // Belirli bir kullanıcının kayıtlarını listeler
-// Belirli bir kullanıcının kayıtlarını listeler
 exports.getUserRegistrations = async (req, res) => {
   try {
     const { userId } = req.params;
 
     const registrations = await Registration.findAll({
       where: {
-        user_id: userId
-      },
+  user_id: userId,
+  status: {
+    [Op.in]: [
+      'registered',
+      'approved'
+    ]
+  }
+},
 
       include: [
         {
@@ -342,6 +372,89 @@ exports.getUserRegistrations = async (req, res) => {
     });
   }
 };
+// Belirli bir kullanıcının iptal ettiği kayıtları getirir
+exports.getUserCancelledRegistrations =
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const registrations =
+        await Registration.findAll({
+          where: {
+            user_id: userId,
+            status: 'cancelled'
+          },
+
+          include: [
+            {
+              model: Event,
+              as: 'event',
+
+              attributes: [
+                'event_id',
+                'title',
+                'description',
+                'event_date',
+                'start_time',
+                'end_time',
+                'status'
+              ],
+
+              include: [
+                {
+                  model: Category,
+                  as: 'category',
+                  attributes: [
+                    'category_id',
+                    'category_name'
+                  ]
+                },
+                {
+                  model: Location,
+                  as: 'location',
+                  attributes: [
+                    'location_id',
+                    'location_name',
+                    'city',
+                    'district'
+                  ]
+                }
+              ]
+            },
+
+            {
+              model: Ticket,
+              as: 'ticket',
+              attributes: [
+                'ticket_id',
+                'ticket_type'
+              ]
+            }
+          ],
+
+          order: [
+            ['registration_date', 'DESC']
+          ]
+        });
+
+      return res.status(200).json({
+        success: true,
+        data: registrations
+      });
+    } catch (error) {
+      console.error(
+        'İptal edilen kayıtlar alınamadı:',
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          'İptal edilen etkinlik kayıtları alınamadı.',
+        error: error.message
+      });
+    }
+  };
 
 // Etkinlik kaydını iptal eder
 exports.cancelRegistration = async (req, res) => {
@@ -350,10 +463,14 @@ exports.cancelRegistration = async (req, res) => {
   try {
     const { registrationId } = req.params;
 
-    const registration = await Registration.findByPk(registrationId, {
-      transaction,
-      lock: transaction.LOCK.UPDATE
-    });
+    const registration =
+      await Registration.findByPk(
+        registrationId,
+        {
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        }
+      );
 
     if (!registration) {
       await transaction.rollback();
@@ -364,10 +481,22 @@ exports.cancelRegistration = async (req, res) => {
       });
     }
 
-    const ticket = await Ticket.findByPk(registration.ticket_id, {
-      transaction,
-      lock: transaction.LOCK.UPDATE
-    });
+    if (registration.status === 'cancelled') {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        success: false,
+        message: 'Bu kayıt daha önce iptal edilmiş.'
+      });
+    }
+
+    const ticket = await Ticket.findByPk(
+      registration.ticket_id,
+      {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      }
+    );
 
     if (ticket) {
       ticket.available_quantity += 1;
@@ -377,7 +506,9 @@ exports.cancelRegistration = async (req, res) => {
       });
     }
 
-    await registration.destroy({
+    registration.status = 'cancelled';
+
+    await registration.save({
       transaction
     });
 
@@ -385,7 +516,8 @@ exports.cancelRegistration = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: 'Etkinlik kaydı iptal edildi.'
+      message: 'Etkinlik kaydı iptal edildi.',
+      data: registration
     });
   } catch (error) {
     await transaction.rollback();
