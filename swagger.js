@@ -31,7 +31,8 @@ const options = {
   './events/routes.js',
   './tickets/routes.js',
   './registrations/routes.js',
-  './app.js'
+  './app.js',
+  './event-ratings/*.js'
   
 ]
 };
