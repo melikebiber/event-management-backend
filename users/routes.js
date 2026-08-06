@@ -160,6 +160,28 @@ router.put(
   check,
   UserController.changePassword
 );
+/**
+ * @swagger
+ * /users/my-ratings:
+ *   get:
+ *     summary: Giriş yapan kullanıcının değerlendirmelerini getirir
+ *     tags:
+ *       - Users
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Değerlendirmeler başarıyla getirildi
+ *       401:
+ *         description: Token eksik veya geçersiz
+ *       500:
+ *         description: Sunucu hatası
+ */
+router.get(
+  '/my-ratings',
+  check,
+  UserController.getMyRatings
+);
 router.get(
   '/:userId',
   check,

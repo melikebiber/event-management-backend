@@ -48,7 +48,9 @@ const UserModel = {
 
 module.exports = (sequelize) =>
   sequelize.define('User', UserModel, {
-    tableName: 'users',
-    timestamps: false
+    tableName: 'users', //Bu model PostgreSQL’deki users isimli tabloyu kullansın.
+    timestamps: false //Sequelize bu tabloya otomatik createdAt ve updatedAt sütunlarını eklemesin.
   });
-  //User.js sadece “kullanıcı verisi nasıl tutulacak?” sorusunun cevabı. //User.js → Kullanıcı tablosunun planı/projesi // data.db → Gerçek veritabanı dosyası // Sequelize → Bu ikisi arasında bağlantı kuran araç eski hali böyleydi
+  // User.js → users tablosunun yapısını tanımlar.
+// PostgreSQL → Gerçek kullanıcı kayıtlarının tutulduğu veritabanıdır.
+// Sequelize → JavaScript modeli ile PostgreSQL tablosu arasında iletişim kurar.

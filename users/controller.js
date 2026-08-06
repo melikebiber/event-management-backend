@@ -6,8 +6,26 @@ const sequelize =
   databaseModule.sequelize ||
   databaseModule;
 const defineUser = require('../common/models/User');
+const defineEventRating =
+  require('../common/models/EventRating');
+
+const defineEvent =
+  require('../common/models/Event');
 
 const User = defineUser(sequelize);
+const EventRating =
+  defineEventRating(sequelize);
+
+const Event =
+  defineEvent(sequelize);
+
+  if (!EventRating.associations.event) {
+  EventRating.belongsTo(Event, {
+    foreignKey: 'event_id',
+    as: 'event'
+  });
+}
+
 //// Şifreyi SHA-256 ile şifreler
 const encryptPassword = (password) =>
   crypto
@@ -289,7 +307,6 @@ exports.updateProfile = async (req, res) => {
     });
   }
 };
-
 // Giriş yapan kullanıcının şifresini değiştirir
 exports.changePassword = async (req, res) => {
   try {
@@ -366,6 +383,73 @@ exports.changePassword = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
+      error: error.message
+    });
+  }
+};
+
+// Giriş yapan kullanıcının değerlendirmelerini getirir
+exports.getMyRatings = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const ratings = await EventRating.findAll({
+      where: {
+        user_id: userId
+      },
+      include: [
+        {
+          model: Event,
+          as: 'event',
+          attributes: [
+            'event_id',
+            'title',
+            'event_date'
+          ]
+        }
+      ],
+      order: [
+        ['created_at', 'DESC']
+      ]
+    });
+
+    const formattedRatings = ratings.map((rating) => {
+      const averageScore =
+        (
+          Number(rating.content_score) +
+          Number(rating.organization_score) +
+          Number(rating.location_score) +
+          Number(rating.satisfaction_score)
+        ) / 4;
+
+      return {
+        rating_id: rating.rating_id,
+        event: rating.event,
+        content_score: rating.content_score,
+        organization_score:
+          rating.organization_score,
+        location_score: rating.location_score,
+        satisfaction_score:
+          rating.satisfaction_score,
+        average_score:
+          Number(averageScore.toFixed(1)),
+        created_at: rating.created_at
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedRatings
+    });
+  } catch (error) {
+    console.error(
+      'Kullanıcı değerlendirmeleri alınamadı:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Değerlendirmeler alınamadı.',
       error: error.message
     });
   }
