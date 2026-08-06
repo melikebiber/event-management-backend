@@ -9,10 +9,11 @@ const options = {
   description: 'Etkinlik yönetim sistemi backend API dokümantasyonu'
 },
     servers: [
-      {
-        url: 'http://localhost:3000'
-      }
-    ],
+  {
+    url: '/',
+    description: 'Aktif sunucu'
+  }
+],
     components: {
       securitySchemes: {
         bearerAuth: {
