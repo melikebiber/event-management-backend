@@ -5,7 +5,11 @@ const sequelize =
   databaseModule.sequelize ||
   databaseModule;
 
-const { fn, col } = require('sequelize');
+const {
+  fn,
+  col,
+  literal
+} = require('sequelize');
 
 const defineEventRating =
   require('../common/models/EventRating');
@@ -21,7 +25,7 @@ const Event = defineEvent(sequelize);
 const Registration = defineRegistration(sequelize);
 
 /**
- * Kullanıcının giriş bilgisindeki ID değerini alır.
+ * Token içindeki kullanıcı ID bilgisini alır.
  */
 const getUserId = (req) => {
   return (
@@ -36,7 +40,7 @@ const getUserId = (req) => {
  */
 exports.createRating = async (req, res) => {
   try {
-    const { eventId } = req.params;
+    const eventId = Number(req.params.eventId);
     const userId = getUserId(req);
 
     const {
@@ -54,6 +58,13 @@ exports.createRating = async (req, res) => {
       });
     }
 
+    if (!Number.isInteger(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli bir etkinlik ID değeri girilmelidir.'
+      });
+    }
+
     const scores = [
       content_score,
       organization_score,
@@ -61,18 +72,21 @@ exports.createRating = async (req, res) => {
       satisfaction_score
     ];
 
-    const invalidScore = scores.some(
-      (score) =>
-        !Number.isInteger(Number(score)) ||
-        Number(score) < 1 ||
-        Number(score) > 5
-    );
+    const invalidScore = scores.some((score) => {
+      const numericScore = Number(score);
+
+      return (
+        !Number.isInteger(numericScore) ||
+        numericScore < 1 ||
+        numericScore > 5
+      );
+    });
 
     if (invalidScore) {
       return res.status(400).json({
         success: false,
         message:
-          'Bütün puanlar 1 ile 5 arasında olmalıdır.'
+          'Bütün puanlar 1 ile 5 arasında tam sayı olmalıdır.'
       });
     }
 
@@ -132,14 +146,19 @@ exports.createRating = async (req, res) => {
 
     const rating = await EventRating.create({
       user_id: userId,
-      event_id: Number(eventId),
+      event_id: eventId,
       content_score: Number(content_score),
       organization_score:
         Number(organization_score),
-      location_score: Number(location_score),
+      location_score:
+        Number(location_score),
       satisfaction_score:
         Number(satisfaction_score),
-      comment: comment?.trim() || null,
+      comment:
+        typeof comment === 'string' &&
+        comment.trim()
+          ? comment.trim()
+          : null,
       updated_at: new Date()
     });
 
@@ -162,6 +181,11 @@ exports.createRating = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error(
+      'Değerlendirme oluşturma hatası:',
+      error
+    );
+
     return res.status(500).json({
       success: false,
       message:
@@ -176,7 +200,101 @@ exports.createRating = async (req, res) => {
  */
 exports.getRatingSummary = async (req, res) => {
   try {
-    const { eventId } = req.params;
+    const eventId = Number(req.params.eventId);
+
+    if (!Number.isInteger(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli bir etkinlik ID değeri girilmelidir.'
+      });
+    }
+
+    const event = await Event.findByPk(eventId);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Etkinlik bulunamadı.'
+      });
+    }
+
+    const result = await EventRating.findOne({
+      where: {
+        event_id: eventId
+      },
+      attributes: [
+        [
+          literal(`
+            AVG(
+              (
+                "content_score" +
+                "organization_score" +
+                "location_score" +
+                "satisfaction_score"
+              ) / 4.0
+            )
+          `),
+          'average_score'
+        ],
+        [
+          fn(
+            'COUNT',
+            col('rating_id')
+          ),
+          'rating_count'
+        ]
+      ],
+      raw: true
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        average_score:
+          result?.average_score !== null &&
+          result?.average_score !== undefined
+            ? Number(
+                Number(
+                  result.average_score
+                ).toFixed(1)
+              )
+            : 0,
+
+        rating_count:
+          Number(result?.rating_count || 0)
+      }
+    });
+  } catch (error) {
+    console.error(
+      'Genel puan alma hatası:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Değerlendirme bilgileri alınamadı.',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Admin için kriterlerin ayrı ortalamalarını getirir.
+ */
+exports.getAdminRatingSummary = async (
+  req,
+  res
+) => {
+  try {
+    const eventId = Number(req.params.eventId);
+
+    if (!Number.isInteger(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Geçerli bir etkinlik ID değeri girilmelidir.'
+      });
+    }
 
     const event = await Event.findByPk(eventId);
 
@@ -195,66 +313,8 @@ exports.getRatingSummary = async (req, res) => {
         [
           fn(
             'AVG',
-            (
-              col('content_score') +
-              col('organization_score') +
-              col('location_score') +
-              col('satisfaction_score')
-            ) / 4
+            col('content_score')
           ),
-          'average_score'
-        ],
-        [
-          fn('COUNT', col('rating_id')),
-          'rating_count'
-        ]
-      ],
-      raw: true
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        average_score:
-          result?.average_score
-            ? Number(
-                Number(
-                  result.average_score
-                ).toFixed(1)
-              )
-            : 0,
-
-        rating_count:
-          Number(result?.rating_count || 0)
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message:
-        'Değerlendirme bilgileri alınamadı.',
-      error: error.message
-    });
-  }
-};
-
-/**
- * Admin için kriterlerin ayrı ortalamalarını getirir.
- */
-exports.getAdminRatingSummary = async (
-  req,
-  res
-) => {
-  try {
-    const { eventId } = req.params;
-
-    const result = await EventRating.findOne({
-      where: {
-        event_id: eventId
-      },
-      attributes: [
-        [
-          fn('AVG', col('content_score')),
           'content_average'
         ],
         [
@@ -265,7 +325,10 @@ exports.getAdminRatingSummary = async (
           'organization_average'
         ],
         [
-          fn('AVG', col('location_score')),
+          fn(
+            'AVG',
+            col('location_score')
+          ),
           'location_average'
         ],
         [
@@ -276,7 +339,10 @@ exports.getAdminRatingSummary = async (
           'satisfaction_average'
         ],
         [
-          fn('COUNT', col('rating_id')),
+          fn(
+            'COUNT',
+            col('rating_id')
+          ),
           'rating_count'
         ]
       ],
@@ -284,7 +350,8 @@ exports.getAdminRatingSummary = async (
     });
 
     const formatAverage = (value) => {
-      return value
+      return value !== null &&
+        value !== undefined
         ? Number(Number(value).toFixed(1))
         : 0;
     };
@@ -317,6 +384,11 @@ exports.getAdminRatingSummary = async (
       }
     });
   } catch (error) {
+    console.error(
+      'Admin puan özeti alma hatası:',
+      error
+    );
+
     return res.status(500).json({
       success: false,
       message:
