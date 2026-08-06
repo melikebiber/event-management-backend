@@ -88,7 +88,25 @@ router.post(
  *     summary: Etkinliğin genel puanını getirir
  *     tags:
  *       - Event Ratings
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Puan bilgisi getirilecek etkinliğin ID değeri
+ *     responses:
+ *       200:
+ *         description: Genel puan başarıyla getirildi
+ *       404:
+ *         description: Etkinlik bulunamadı
+ *       500:
+ *         description: Sunucu hatası
  */
+router.get(
+  '/:eventId/rating-summary',
+  RatingController.getRatingSummary
+);
 router.get(
   '/:eventId/rating-summary',
   RatingController.getRatingSummary
@@ -103,7 +121,29 @@ router.get(
  *       - Event Ratings
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: eventId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Detaylı puanı getirilecek etkinliğin ID değeri
+ *     responses:
+ *       200:
+ *         description: Detaylı puanlar başarıyla getirildi
+ *       401:
+ *         description: Yetkilendirme gerekli
+ *       403:
+ *         description: Admin yetkisi gerekli
+ *       500:
+ *         description: Sunucu hatası
  */
+router.get(
+  '/:eventId/rating-summary/admin',
+  check,
+  has('ADMIN'),
+  RatingController.getAdminRatingSummary
+);
 router.get(
   '/:eventId/rating-summary/admin',
   check,
