@@ -150,6 +150,29 @@ exports.createRegistration = async (req, res) => {
         message: 'Belirtilen event_id için etkinlik bulunamadı.'
       });
     }
+    const today = new Date()
+  .toISOString()
+  .slice(0, 10);
+
+if (event.event_date < today) {
+  await transaction.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message:
+      'Tarihi geçmiş bir etkinliğe kayıt olunamaz.'
+  });
+}
+
+if (event.status !== 'active') {
+  await transaction.rollback();
+
+  return res.status(400).json({
+    success: false,
+    message:
+      'Bu etkinlik şu anda kayıt kabul etmiyor.'
+  });
+}
 
     const ticket = await Ticket.findByPk(ticket_id, {
       transaction,
